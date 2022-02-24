@@ -29,6 +29,7 @@ type PageState = {
     colorMountain : number,
     renderer: Renderer | null,
 }
+
 class Page extends React.Component<{}, PageState> {
     constructor(props) {
         super(props);
