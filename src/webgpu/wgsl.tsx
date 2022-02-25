@@ -653,7 +653,7 @@ struct returnElement{
 };
 
 struct lastIndex{
-    endIndex:u32;
+    endIndex:i32;
 };
 
 [[group(0), binding(0)]] var<storage, read> nodes:Nodes;
@@ -737,7 +737,7 @@ fn isBounded( boundary: Boundary, node: Node)->bool{
               quadtree.CoM.y = node.y;
               break;
         }
-
+       
         if((tree.quad[index].isDivided == 0) && tree.quad[index].mass>0){
              //remove node data at that node
             let nodePosition:Position = tree.quad[index].CoM;
@@ -751,11 +751,12 @@ fn isBounded( boundary: Boundary, node: Node)->bool{
             let NW:Quadtree = quad[3];
     
             //add that point to tree
-            let treeLength:u32 = arrayLength(tree.quad);
+            let treeLength:i32 =  lastindex.endIndex;
             tree.quad[treeLength] = SE;
             tree.quad[treeLength+1] = SW;
             tree.quad[treeLength+2] = NE;
             tree.quad[treeLength+3] = NW;
+            lastindex.endIndex = lastindex.endIndex + 4; 
             
             tree.quad[index].SE = treeLength; 
             tree.quad[index].SW = treeLength+1;
@@ -764,45 +765,45 @@ fn isBounded( boundary: Boundary, node: Node)->bool{
     
             var localQuad:Quadtree = tree.quad[treeLength];
             if(isBounded(localQuad.boundary, node)){   
-                tree.localQuad[index].mass = 1;
-                tree.localQuad[index].CoM.x = node.x;
-                tree.localQuad[index].CoM.y = node.y;
+                tree.quad[treeLength].mass = 1;
+                tree.quad[treeLength].CoM.x = node.x;
+                tree.quad[treeLength].CoM.y = node.y;
             }
             
             localQuad = tree.quad[treeLength+1];
             if(isBounded(localQuad.boundary, node)){               
-                tree.localQuad[index].mass = 1;
-                tree.localQuad[index].CoM.x = node.x;
-                tree.localQuad[index].CoM.y = node.y;
+                tree.quad[treeLength+1].mass = 1;
+                tree.quad[treeLength+1].CoM.x = node.x;
+                tree.quad[treeLength+1].CoM.y = node.y;
             }
 
             localQuad = tree.quad[treeLength+2];
             if(isBounded(localQuad.boundary, node)){
-                tree.localQuad[index].mass = 1;
-                tree.localQuad[index].CoM.x = node.x;
-                tree.localQuad[index].CoM.y = node.y;
+                tree.quad[treeLength+2].mass = 1;
+                tree.quad[treeLength+2].CoM.x = node.x;
+                tree.quad[treeLength+2].CoM.y = node.y;
             }
     
             localQuad = tree.quad[treeLength+3];
             if(isBounded(localQuad.boundary, node)){
                
-                tree.localQuad[index].mass = 1;
-                tree.localQuad[index].CoM.x = node.x;
-                tree.localQuad[index].CoM.y = node.y;
+                tree.quad[treeLength+3].mass = 1;
+                tree.quad[treeLength+3].CoM.x = node.x;
+                tree.quad[treeLength+3].CoM.y = node.y;
             }
          }
     
-        let totalX:f32 = tree.quad[index].CoM.x*Tree.quad[index].mass + node.x;
-        let totalY:f32 = tree.quad[index].CoM.y*Tree.quad[index].mass + node.y;
+        let totalX:f32 = ((tree.quad[index].CoM.x)*(f32(tree.quad[index].mass))) + node.x;
+        let totalY:f32 = ((tree.quad[index].CoM.y)*(f32(tree.quad[index].mass))) + node.y;
     
-        Tree.quad[index].mass = tree.quad[index].mass + 1;
+        tree.quad[index].mass = tree.quad[index].mass + 1;
     
-        tree.quad[index].CoM.x = totalX/tree.quad[index].mass;
-        tree.quad[index].CoM.y = totalY/tree.quad[index].mass;
+        tree.quad[index].CoM.x = totalX/f32(tree.quad[index].mass);
+        tree.quad[index].CoM.y = totalY/f32(tree.quad[index].mass);
         
         let oldIndex:i32 = index;
-        let childIndex:i32 =  tree.quad[index].SE;
-        let testingQuad:Quadtree = tree.quad[childIndex];
+        var childIndex:i32 =  tree.quad[index].SE;
+        var testingQuad:Quadtree = tree.quad[childIndex];
         if(isBounded(quadtree.boundary, node)){
            index= childIndex;
            continue;
@@ -840,9 +841,9 @@ fn isBounded( boundary: Boundary, node: Node)->bool{
 
 [[stage(compute), workgroup_size(1,1,1)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>){
-    var coverQuad:Quadtree = Quadtree(Boundary(0f, 0f, 0f, 1f), Position(0f, 0f), 0, 0, 0, 0, 0, 0);
-    Tree.quad[0] = coverQuad;
-    let nodes_length:i32 = uniforms.nodes_length;
+  var coverQuad:Quadtree = Quadtree(Boundary(0f, 0f, 0f, 1f), Position(0f, 0f), 0, 0, 0, 0, 0, 0);
+  tree.quad[0] = coverQuad;
+  let nodes_length:i32 = uniforms.nodes_length;
   let theta:f32 = uniforms.theta;
   if(global_id.x>=u32(uniforms.nodes_length)){
     return;

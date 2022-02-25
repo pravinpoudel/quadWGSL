@@ -69,7 +69,7 @@ var ForceDirected = /** @class */ (function () {
             mappedAtCreation: true,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
         });
-        new Uint32Array(this.lastIndexBuffer.getMappedRange()).set([0]);
+        new Int32Array(this.lastIndexBuffer.getMappedRange()).set([0]);
         this.lastIndexBuffer.unmap();
         this.uniformParameterBuffer = this.device.createBuffer({
             size: 16,
