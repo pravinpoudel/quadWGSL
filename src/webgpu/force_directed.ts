@@ -67,6 +67,7 @@ class ForceDirected {
       mappedAtCreation: true,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
+
     new Int32Array(this.lastIndexBuffer.getMappedRange()).set([0]);
     this.lastIndexBuffer.unmap();
 
@@ -244,7 +245,7 @@ class ForceDirected {
     });
 
     this.treeBuffer = this.device.createBuffer({
-      size: (nodeLength + 1) * 4 * 16,
+      size: (nodeLength + 1) * 4 * 12 * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
@@ -372,7 +373,7 @@ class ForceDirected {
     treeComputePass.endPass();
 
     let gpuReadTreeBuffer = this.device.createBuffer({
-      size: nodeLength * 16,
+      size: (nodeLength + 1) * 4 * 12 * 4,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
     commandEncoder.copyBufferToBuffer(
@@ -382,6 +383,12 @@ class ForceDirected {
       0,
       nodeLength * 6
     );
+    
+    await gpuReadTreeBuffer.mapAsync(GPUMapMode.READ);
+    const arrayBuffer = gpuReadTreeBuffer.getMappedRange();
+    var resultTree = new Float32Array(arrayBuffer);
+    gpuReadTreeBuffer.unmap();
+    console.log(resultTree);
 
     while (
       iterationCount > 0 &&

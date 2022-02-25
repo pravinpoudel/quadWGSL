@@ -206,7 +206,7 @@ var ForceDirected = /** @class */ (function () {
         if (iterationCount === void 0) { iterationCount = this.iterationCount; }
         if (threshold === void 0) { threshold = this.threshold; }
         return __awaiter(this, void 0, void 0, function () {
-            var upload, mapping, arrInstance, commandEncoder, createBindGroup, pass, iterationTimes, totalStart, applyBindGroup, bindGroupTree, treeComputePass, gpuReadTreeBuffer, upload, mapping, commandEncoder, bindGroup, attractBindGroup, pass, pass, start, end, totalEnd, iterAvg;
+            var upload, mapping, arrInstance, commandEncoder, createBindGroup, pass, iterationTimes, totalStart, applyBindGroup, bindGroupTree, treeComputePass, gpuReadTreeBuffer, arrayBuffer, resultTree, upload, mapping, commandEncoder, bindGroup, attractBindGroup, pass, pass, start, end, totalEnd, iterAvg;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -234,7 +234,7 @@ var ForceDirected = /** @class */ (function () {
                             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
                         });
                         this.treeBuffer = this.device.createBuffer({
-                            size: (nodeLength + 1) * 4 * 16,
+                            size: (nodeLength + 1) * 4 * 12 * 4,
                             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
                         });
                         this.uniformParameterBuffer = this.device.createBuffer({
@@ -351,15 +351,22 @@ var ForceDirected = /** @class */ (function () {
                         treeComputePass.dispatch(nodeLength, 1, 1);
                         treeComputePass.endPass();
                         gpuReadTreeBuffer = this.device.createBuffer({
-                            size: nodeLength * 16,
+                            size: (nodeLength + 1) * 4 * 12 * 4,
                             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
                         });
                         commandEncoder.copyBufferToBuffer(this.treeBuffer, 0, gpuReadTreeBuffer, 0, nodeLength * 6);
-                        _a.label = 1;
+                        return [4 /*yield*/, gpuReadTreeBuffer.mapAsync(GPUMapMode.READ)];
                     case 1:
+                        _a.sent();
+                        arrayBuffer = gpuReadTreeBuffer.getMappedRange();
+                        resultTree = new Float32Array(arrayBuffer);
+                        gpuReadTreeBuffer.unmap();
+                        console.log(resultTree);
+                        _a.label = 2;
+                    case 2:
                         if (!(iterationCount > 0 &&
                             this.coolingFactor > 0.000001 &&
-                            this.force >= 0)) return [3 /*break*/, 3];
+                            this.force >= 0)) return [3 /*break*/, 4];
                         iterationCount--;
                         upload = this.device.createBuffer({
                             size: 4 * 4,
@@ -446,7 +453,7 @@ var ForceDirected = /** @class */ (function () {
                         this.device.queue.submit([commandEncoder.finish()]);
                         start = performance.now();
                         return [4 /*yield*/, this.device.queue.onSubmittedWorkDone()];
-                    case 2:
+                    case 3:
                         _a.sent();
                         end = performance.now();
                         console.log("iteration time " + (end - start));
@@ -458,8 +465,8 @@ var ForceDirected = /** @class */ (function () {
                         // var output = new Float32Array(arrayBuffer);
                         // console.log(output);
                         this.coolingFactor = this.coolingFactor * coolingFactor;
-                        return [3 /*break*/, 1];
-                    case 3:
+                        return [3 /*break*/, 2];
+                    case 4:
                         totalEnd = performance.now();
                         iterAvg = iterationTimes.reduce(function (a, b) {
                             return a + b;

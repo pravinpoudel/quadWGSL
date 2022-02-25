@@ -831,8 +831,7 @@ fn isBounded( boundary: Boundary, node: Node)->bool{
         }
         if(index == oldIndex){
             break;
-        }
-               
+        }    
     }
  }
 
