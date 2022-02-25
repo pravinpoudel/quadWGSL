@@ -587,84 +587,110 @@ fn main([[builtin(global_invocation_id)]] global_id : vec3<u32>) {
 `;
 
 
+        // //code to pop last element
+
+        // length = length - 1;
+        // let lastElement:i32 = childList[length];
+
+        // var newarray:array<i32, length>;
+        // let i:i32 =0;
+        // loop{
+        //     if (i>=length) { break;}
+        //     newarray[i] = childList[i];
+        //     i = i + 1;
+        // };
+
+        // //----------------
+
+
 export const buildTree = `struct Node{
     value:f32;
     x: f32;
     y: f32;
     size:f32;
-}
+};
 
 struct Boundary{
     x: f32;
     y: f32;
     w: f32;
-    h: f32
-}
+    h: f32;
+};
 
 struct Position{
-    x:f32;
-    y: f32
-}
+    x: f32;
+    y: f32;
+};
 
 //make a default value in this
 struct Quadtree{
     boundary: Boundary;
     CoM: Position;
-    mass: u32;
-    NE: u32;
-    NW: u32;
-    SE: u32;
-    SW: u32;
-    isDivided: bool;
-}
+    mass: i32;
+    NE: i32;
+    NW: i32;
+    SE: i32;
+    SW: i32;
+    isDivided: i32;
+};
 
 struct Nodes{
   nodes: array<Node>;
 };
 
 struct Tree{
-    quad: array<Quadtree>
-}
+    quad: array<Quadtree>;
+};
 
-struct uniforms{
-  nodes_length:u32;
+struct Uniform{
+  nodes_length:i32;
   theta: f32;
-}
+};
+
+struct returnElement{
+    popped:i32;
+    newarray:array<i32>;
+};
+
+struct lastIndex{
+    endIndex:u32;
+};
 
 [[group(0), binding(0)]] var<storage, read> nodes:Nodes;
-[[group(0), binding(1)]] var<storage> tree:Tree;
-[[group(0), binding(1)]] var<uniform> uniforms:uniforms;
+[[group(0), binding(1)]] var<storage, read_write> tree:Tree;
+[[group(0), binding(2)]] var<uniform> uniforms:Uniform;
+[[group(0), binding(3)]] var<storage, read_write> lastindex:lastIndex;
 
-function partition(quadtree:Quadtree)-> array<Quadtree>{
-    var child:array<Quadtree>;
+fn partition(quadtree:Quadtree)-> array<Quadtree, 4>{
 
+    var child:array<Quadtree, 4>;
     let x:f32 = quadtree.boundary.x;
     let y:f32 = quadtree.boundary.y;
     let w:f32 = quadtree.boundary.w;
     let h:f32 = quadtree.boundary.h;
 
-    let MASS:u32 = 0;
+    var MASS:i32 = 0;
     let COM:Position = Position(0.0f, 0.0f);
-    let ISDIVIDED:bool = false;
+    let ISDIVIDED:i32 = 0;
 
-    let NE:u32 = 0;
-    let NW:u32 = 0;
-    let SE:U32 = 0;
-    let SW:u32 = 0;
+    let NE:i32 = 0;
+    let NW:i32 = 0;
+    let SE:i32 = 0;
+    let SW:i32 = 0;
 
-    let SE_BOUNDARY = Boundary(x+(w/2), y+(h/2), w/2, w/2);
-    let SW_BOUNDARY = Boundary(x-(w/2), y+(h/2), w/2, w/2);
-    let NE_BOUNDARY = Boundary(x+(w/2), y-(h/2), w/2, w/2);
-    let NW_BOUNDARY = Boundary(x-(w/2), y+(h/2), w/2, w/2);
+    let SE_BOUNDARY:Boundary = Boundary(x+(w/2f), y+(h/2f), w/2f, w/2f);
+    let SW_BOUNDARY:Boundary = Boundary(x-(w/2f), y+(h/2f), w/2f, w/2f);
+    let NE_BOUNDARY:Boundary = Boundary(x+(w/2f), y-(h/2f), w/2f, w/2f);
+    let NW_BOUNDARY:Boundary = Boundary(x-(w/2f), y+(h/2f), w/2f, w/2f);
     
-    var SE: Quadtree = Quadtree(SE_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
-    child[0] = SE;    
-    var SW: Quadtree = Quadtree(SW_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
-    child[1] = SW;
-    var NE: Quadtree = Quadtree(NE_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
-    child[2] = NE;
-    var NW: Quadtree = Quadtree(NW_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
-    child[3] = NW;
+    var SE_CHILD: Quadtree = Quadtree(SE_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
+    child[0] = SE_CHILD;    
+    var SW_CHILD: Quadtree = Quadtree(SW_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
+    child[1] = SW_CHILD;
+    var NE_CHILD: Quadtree = Quadtree(NE_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
+    child[2] = NE_CHILD;
+    var NW_CHILD: Quadtree = Quadtree(NW_BOUNDARY, COM, MASS, NE, NW, SE, SW, ISDIVIDED);
+    child[3] = NW_CHILD;
     return child;
 }
 
@@ -696,79 +722,131 @@ fn isBounded( boundary: Boundary, node: Node)->bool{
     }
   }
 
+
 // check that quadtree in the main quadtree array
 
-  fn insert(node:Node, index:u32)-> bool{
-      
-    if(!isBounded(Tree.quad[index].boundary, node)){
-          return false;
-      }
+  fn insert(node:Node){
 
-    if(Tree.quad[index].mass<1){
-          quadtree.mass++;
-          quadtree.CoM.x = node.x;
-          quadtree.CoM.y = node.y;
-          return true;
-      }
+    var index:i32 = 0;
+    var quadtree:Quadtree;
+    loop{
+        quadtree = tree.quad[index];
+        if(tree.quad[index].mass<1){
+              quadtree.mass = 1;
+              quadtree.CoM.x = node.x;
+              quadtree.CoM.y = node.y;
+              break;
+        }
+
+        if((tree.quad[index].isDivided == 0) && tree.quad[index].mass>0){
+             //remove node data at that node
+            let nodePosition:Position = tree.quad[index].CoM;
+            let removingNode:Node = Node(0f, nodePosition.x, nodePosition.y, 1.0f); 
+            
+            tree.quad[index].isDivided = 1;
+            let quad:array<Quadtree, 4> = partition(tree.quad[index]);
+            let SE:Quadtree = quad[0];
+            let SW:Quadtree = quad[1];
+            let NE:Quadtree = quad[2];
+            let NW:Quadtree = quad[3];
     
-    if(!Tree.quad[index].isDivided && Tree.quad[index].mass>0){
-         //remove node data at that node
-        let nodePosition:Position = tree.quad[index].CoM;
-        let removingNode:Node = Node(0f, nodePosition.x, nodePosition.y, 1.0f); 
-        //create a quad
-        let quad:array<Quadtree> = partition(Tree.quad[index]);
-        let SE:Quadtree = quad[0];
-        let SW:Quadtree = quad[1];
-        let NE:Quadtree = quad[2];
-        let NW:Quadtree = quad[3];
+            //add that point to tree
+            let treeLength:u32 = arrayLength(tree.quad);
+            tree.quad[treeLength] = SE;
+            tree.quad[treeLength+1] = SW;
+            tree.quad[treeLength+2] = NE;
+            tree.quad[treeLength+3] = NW;
+            
+            tree.quad[index].SE = treeLength; 
+            tree.quad[index].SW = treeLength+1;
+            tree.quad[index].NE = treeLength+2;
+            tree.quad[index].NW = treeLength+3;
+    
+            var localQuad:Quadtree = tree.quad[treeLength];
+            if(isBounded(localQuad.boundary, node)){   
+                tree.localQuad[index].mass = 1;
+                tree.localQuad[index].CoM.x = node.x;
+                tree.localQuad[index].CoM.y = node.y;
+            }
+            
+            localQuad = tree.quad[treeLength+1];
+            if(isBounded(localQuad.boundary, node)){               
+                tree.localQuad[index].mass = 1;
+                tree.localQuad[index].CoM.x = node.x;
+                tree.localQuad[index].CoM.y = node.y;
+            }
 
-        //add that point to tree
-        let treeLength = arrayLength(Tree.quad);
-        Tree.quad[treeLength] = SE;
-        Tree.quad[treeLength+1] = SW;
-        Tree.quad[treeLength+2] = NE;
-        Tree.quad[treeLength+3] = NW;
+            localQuad = tree.quad[treeLength+2];
+            if(isBounded(localQuad.boundary, node)){
+                tree.localQuad[index].mass = 1;
+                tree.localQuad[index].CoM.x = node.x;
+                tree.localQuad[index].CoM.y = node.y;
+            }
+    
+            localQuad = tree.quad[treeLength+3];
+            if(isBounded(localQuad.boundary, node)){
+               
+                tree.localQuad[index].mass = 1;
+                tree.localQuad[index].CoM.x = node.x;
+                tree.localQuad[index].CoM.y = node.y;
+            }
+         }
+    
+        let totalX:f32 = tree.quad[index].CoM.x*Tree.quad[index].mass + node.x;
+        let totalY:f32 = tree.quad[index].CoM.y*Tree.quad[index].mass + node.y;
+    
+        Tree.quad[index].mass = tree.quad[index].mass + 1;
+    
+        tree.quad[index].CoM.x = totalX/tree.quad[index].mass;
+        tree.quad[index].CoM.y = totalY/tree.quad[index].mass;
         
-        Tree.quad[index].SE = treelength; 
-        Tree.quad[index].SW = treelength+1;
-        Tree.quad[index].NE = treelength+2;
-        Tree.quad[index].NW = treelength+3;
+        let oldIndex:i32 = index;
+        let childIndex:i32 =  tree.quad[index].SE;
+        let testingQuad:Quadtree = tree.quad[childIndex];
+        if(isBounded(quadtree.boundary, node)){
+           index= childIndex;
+           continue;
+        }
 
-        //check where does it exist among four
-        insert(removingNode, treeLength-1)||
-        insert(removingNode, treeLength) ||
-        insert(removingNode, treeLength+1) ||
-        insert(removingNode, treeLength+2)
-         //add new point to tree 
-     }
+        childIndex =  tree.quad[index].SW;
+        testingQuad = tree.quad[childIndex];
+        if(isBounded(quadtree.boundary, node)){
+            index = childIndex;
+            continue;
+        }
 
-    let totalX:f32 = Tree.quad[index].CoM.x*Tree.quad[index].mass + node.x;
-    let totalY:f32 = Tree.quad[index].CoM.y*Tree.quad[index].mass + node.y;
+        childIndex =  tree.quad[index].NE;
+        testingQuad = tree.quad[childIndex];
+        if(isBounded(quadtree.boundary, node)){
+            index = childIndex;
+            continue;
+        }
 
-    Tree.quad[index].mass += 1;
-
-    Tree.quad[index].CoM.x = totalX/Tree.quad[index].mass;
-    Tree.quad[index].CoM.y = totalY/Tree.quad[index].mass;
-       
-    return (
-        insert(node, Tree.quad[index].SE)||
-        insert(node, Tree.quad[index].SW) ||
-        insert(node, Tree.quad[index].NE) ||
-        insert(node, Tree.quad[index].NW)
-    );
+        childIndex = tree.quad[index].NW;
+        testingQuad = tree.quad[childIndex];
+        if(isBounded(quadtree.boundary, node)){
+            index = childIndex;
+            continue;
+        }
+        if(index == oldIndex){
+            break;
+        }
+               
+    }
  }
 
   //writing 0f in child quad because it doesnot matter what they are when isDivided is false
-  var coverQuad:Quadtree = Quadtree(Boundary(0f, 0f, 0f, 1f), Postition(0f, 0f), 0f, 0f, 0f, 0f, 0f, false);
-  Tree.quad[0] = coverQuad;
+
 
 [[stage(compute), workgroup_size(1,1,1)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>){
-  let nodes_length:u32 = uniforms.nodes_length;
+    var coverQuad:Quadtree = Quadtree(Boundary(0f, 0f, 0f, 1f), Position(0f, 0f), 0, 0, 0, 0, 0, 0);
+    Tree.quad[0] = coverQuad;
+    let nodes_length:i32 = uniforms.nodes_length;
   let theta:f32 = uniforms.theta;
   if(global_id.x>=u32(uniforms.nodes_length)){
     return;
   }
   let node:Node = nodes.nodes[global_id.x];
-  insert(node, 0f);
+  insert(node);
 }`;

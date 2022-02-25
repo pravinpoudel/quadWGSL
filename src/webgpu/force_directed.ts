@@ -16,7 +16,8 @@ class ForceDirected {
   public adjMatrixBuffer: GPUBuffer;
   public forceDataBuffer: GPUBuffer;
   public treeBuffer: GPUBuffer;
-  public uniformParamterBuffer: GPUBuffer;
+  public lastIndexBuffer: GPUBuffer;
+  public uniformParameterBuffer: GPUBuffer;
   public coolingFactor: number = 0.9;
   public device: GPUDevice;
 
@@ -58,10 +59,18 @@ class ForceDirected {
 
     this.treeBuffer = this.device.createBuffer({
       size: 16,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
-    this.uniformParamterBuffer = this.device.createBuffer({
+    this.lastIndexBuffer = this.device.createBuffer({
+      size: 4,
+      mappedAtCreation: true,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+    new Uint32Array(this.lastIndexBuffer.getMappedRange()).set([0]);
+    this.lastIndexBuffer.unmap();
+
+    this.uniformParameterBuffer = this.device.createBuffer({
       size: 16,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -82,7 +91,7 @@ class ForceDirected {
           binding: 0,
           visibility: GPUShaderStage.COMPUTE,
           buffer: {
-            type: "read-only-storage",
+            type: "read-only-storage" as GPUBufferBindingType,
           },
         },
         {
@@ -90,7 +99,7 @@ class ForceDirected {
           binding: 1,
           visibility: GPUShaderStage.COMPUTE,
           buffer: {
-            type: "storage",
+            type: "storage" as GPUBufferBindingType,
           },
         },
         {
@@ -98,7 +107,15 @@ class ForceDirected {
           binding: 2,
           visibility: GPUShaderStage.COMPUTE,
           buffer: {
-            type: "uniform",
+            type: "uniform" as GPUBufferBindingType,
+          },
+        },
+
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "storage" as GPUBufferBindingType,
           },
         },
       ],
@@ -227,10 +244,20 @@ class ForceDirected {
     });
 
     this.treeBuffer = this.device.createBuffer({
-      size: nodeLength*16,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+      size: (nodeLength + 1) * 4 * 16,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
-    
+
+    this.uniformParameterBuffer = this.device.createBuffer({
+      size: 8,
+      usage: GPUBufferUsage.UNIFORM,
+      mappedAtCreation: true,
+    });
+
+    let arrInstance = this.uniformParameterBuffer.getMappedRange();
+    new Uint8Array(arrInstance).set([nodeLength]);
+    new Float32Array(arrInstance).set([0.5], 1);
+
     var commandEncoder = this.device.createCommandEncoder();
     commandEncoder.copyBufferToBuffer(upload, 0, this.paramsBuffer, 0, 4 * 4);
     var createBindGroup = this.device.createBindGroup({
@@ -313,6 +340,49 @@ class ForceDirected {
         },
       ],
     });
+
+    const bindGroupTree = this.device.createBindGroup({
+      layout: this.bindGroupLayoutTree,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.nodeDataBuffer },
+        },
+
+        {
+          binding: 1,
+          resource: { buffer: this.treeBuffer },
+        },
+
+        {
+          binding: 2,
+          resource: { buffer: this.uniformParameterBuffer },
+        },
+        {
+          binding: 3,
+          resource: { buffer: this.lastIndexBuffer },
+        },
+      ],
+    });
+
+    var treeComputePass = commandEncoder.beginComputePass();
+    treeComputePass.setPipeline(this.computeTreePipeline);
+    treeComputePass.setBindGroup(0, bindGroupTree);
+    treeComputePass.dispatch(nodeLength, 1, 1);
+    treeComputePass.endPass();
+
+    let gpuReadTreeBuffer = this.device.createBuffer({
+      size: nodeLength * 16,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+    commandEncoder.copyBufferToBuffer(
+      this.treeBuffer,
+      0,
+      gpuReadTreeBuffer,
+      0,
+      nodeLength * 6
+    );
+
     while (
       iterationCount > 0 &&
       this.coolingFactor > 0.000001 &&
@@ -334,26 +404,6 @@ class ForceDirected {
       //commandEncoder.writeTimestamp();
       commandEncoder.copyBufferToBuffer(upload, 0, this.paramsBuffer, 0, 4 * 4);
       // Create bind group
-
-      const bindGroupTree = this.device.createBindGroup({
-        layout: this.bindGroupLayoutTree,
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: this.nodeDataBuffer },
-          },
-
-          {
-            binding: 1,
-            resource: { buffer: this.treeBuffer },
-          },
-
-          {
-            binding: 2,
-            resource: { buffer: this.uniformParamterBuffer },
-          },
-        ],
-      });
 
       var bindGroup = this.device.createBindGroup({
         layout: this.computeForcesPipeline.getBindGroupLayout(0),
@@ -420,12 +470,6 @@ class ForceDirected {
           // }
         ],
       });
-
-      var treeComputePass = commandEncoder.beginComputePass();
-      treeComputePass.setPipeline(this.computeTreePipeline);
-      treeComputePass.setBindGroup(0, bindGroupTree);
-      pass.dispatch(nodeLength, 1, 1);
-      treeComputePass.endPass();
 
       // Run attract forces pass
       // var pass = commandEncoder.beginComputePass();
